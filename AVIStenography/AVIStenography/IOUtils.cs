@@ -16,7 +16,7 @@ namespace AVIStenography {
                 Console.WriteLine($"{filePath} loading.");
                 return avi;
             }
-            catch (IOException e) {
+            catch (IOException) {
                 ConsolePrintFailure();
                 Console.WriteLine($"{filePath} loading.");
                 return null;
@@ -34,7 +34,7 @@ namespace AVIStenography {
                 Console.WriteLine($"Saving data to {filePath}");
 
                 ConsolePrintWarning();
-                Console.WriteLine($"Saving data to current directory as TEMP.avi");
+                Console.WriteLine("Saving data to current directory as TEMP.avi");
                 File.WriteAllBytes("TEMP.avi", data);
             }
         }
@@ -61,6 +61,18 @@ namespace AVIStenography {
             Console.Write("WARNING");
             Console.ForegroundColor = ConsoleColor.White;
             Console.Write(" ] ");
+        }
+
+        public static bool ConsoleOption(string text) {
+            Console.WriteLine(text);
+
+            Char key;
+            do {
+                Console.WriteLine("Press 'Y' to continue or 'N' to abort.");
+                key = Console.ReadKey().KeyChar;
+            } while (key == 'y' || key == 'n' || key == 'Y' || key == 'N');
+
+            return key == 'y' || key == 'Y' ? true : false;
         }
 
     }

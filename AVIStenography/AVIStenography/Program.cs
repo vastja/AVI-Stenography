@@ -24,6 +24,11 @@ namespace AVIStenography {
             AVIMAINHEADER avih = handler.GetAVIMainHeader();
 
             var info = handler.GetVideoStreamInfo();
+            if (info.Item1.cb == 0) {
+                IOUtils.ConsolePrintFailure();
+                Console.WriteLine("AVI file does not contain video stream header. Execution ABBORTED.");
+                Exit(-1);
+            }
 
 
             Int32 junkSize = handler.GetJunkChunksSize();
@@ -31,6 +36,7 @@ namespace AVIStenography {
             Console.WriteLine($"Available free junk space: {junkSize}B");
 
             handler.SearchMoviList();
+
 
             Exit(0);
 
@@ -40,22 +46,6 @@ namespace AVIStenography {
             Console.WriteLine("Press any key to exit ...");
             Console.ReadKey();
             Environment.Exit(code);
-        }
-
-
-        private static int GetChunkDataSize(byte[] avi, int chunkStartIndex) {
-
-            for (int i = 0; i < 4; i++) {
-                Console.Write((char)avi[chunkStartIndex + i]);
-            }
-
-            byte[] chunkDataSize = new byte[4];
-
-            for (int i = 0; i < 4; i++) {
-                chunkDataSize[i] = avi[chunkStartIndex + 4 + i];
-            }
-
-            return BitConverter.ToInt32(chunkDataSize, 0);
         }
 
     }
