@@ -70,7 +70,8 @@ namespace AVIStenography {
             do {
                 Console.WriteLine("Press 'Y' to continue or 'N' to abort.");
                 key = Console.ReadKey().KeyChar;
-            } while (key == 'y' || key == 'n' || key == 'Y' || key == 'N');
+            } while (!(key == 'y' || key == 'n' || key == 'Y' || key == 'N'));
+            Console.WriteLine();
 
             return key == 'y' || key == 'Y' ? true : false;
         }

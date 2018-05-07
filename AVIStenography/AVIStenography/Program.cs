@@ -19,23 +19,14 @@ namespace AVIStenography {
                 Exit(-1);
             }
 
+            string message = "abcdefghijklmnopqrstuvwxyz" + (char)0x03;
+
             AVIFileHandler handler = new AVIFileHandler(avi);
+            StenogrpahyUtils.HideMessage(handler, message);
 
-            AVIMAINHEADER avih = handler.GetAVIMainHeader();
+            //AVIMAINHEADER avih = handler.GetAVIMainHeader();
 
-            var info = handler.GetVideoStreamInfo();
-            if (info.Item1.cb == 0) {
-                IOUtils.ConsolePrintFailure();
-                Console.WriteLine("AVI file does not contain video stream header. Execution ABBORTED.");
-                Exit(-1);
-            }
-
-
-            Int32 junkSize = handler.GetJunkChunksSize();
-            IOUtils.ConsolePrintSuccess();
-            Console.WriteLine($"Available free junk space: {junkSize}B");
-
-            handler.SearchMoviList();
+            
 
 
             Exit(0);

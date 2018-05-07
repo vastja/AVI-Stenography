@@ -35,40 +35,40 @@ namespace AVIStenography {
         public Dictionary<byte[], List<Int32>> MoviList { get; protected set; }
         public Dictionary<Int32, CHUNK> Junks { get; protected set; }
 
-        private byte[] avi;
+        public byte[] Avi { get; protected set; }
 
         public AVIFileHandler(byte[] avi) {
-            this.avi = avi;
+            Avi = avi;
         }
 
         public UInt32 GetRIFFFileSize() {
-            return BitConverter.ToUInt32(avi, 4);
+            return BitConverter.ToUInt32(Avi, 4);
         }
 
         public AVIMAINHEADER GetAVIMainHeader() {
 
-            int index = Find(hdrl, 0, avi.Length);
+            int index = Find(hdrl, 0, Avi.Length);
             if (index < 0) {
-                IOUtils.ConsolePrintFailure();
-                Console.WriteLine("AVI file does not contain AVIMAINHEADER. Execution ABORTED.");
-                Program.Exit(-1);
+                //IOUtils.ConsolePrintFailure();
+                //Console.WriteLine("AVI file does not contain AVIMAINHEADER. Execution ABORTED.");
+                return new AVIMAINHEADER();
             }
 
-            return new AVIMAINHEADER(avi, index);
+            return new AVIMAINHEADER(Avi, index);
         }
 
         public (AVISTREAMHEADER, BITMAPINFOHEADER) GetVideoStreamInfo() {
 
-            int index = Find(strh, 0, avi.Length);
+            int index = Find(strh, 0, Avi.Length);
             while (index > 0) {
-                AVISTREAMHEADER avish = new AVISTREAMHEADER(avi, index - 4);
+                AVISTREAMHEADER avish = new AVISTREAMHEADER(Avi, index - 4);
 
                 if (avish.fccType.Equals(BitConverter.ToUInt32(vids, 0))) {
-                    BITMAPINFOHEADER bih = new BITMAPINFOHEADER(avi, index + 12 + (int) avish.cb);
+                    BITMAPINFOHEADER bih = new BITMAPINFOHEADER(Avi, index + 12 + (int) avish.cb);
                     return (avish, bih);
                 }
 
-                index = Find(strh, 0, avi.Length);
+                index = Find(strh, 0, Avi.Length);
             }
 
             return (new AVISTREAMHEADER(), new BITMAPINFOHEADER());
@@ -82,17 +82,22 @@ namespace AVIStenography {
                 { AUDIO_CHUNK, new List<Int32>()},
             };
 
-            int index = Find(LIST, 0, avi.Length);
+            int index = Find(LIST, 0, Avi.Length);
             while (index > 0) {
-                CHUNK chunk = new CHUNK(avi, index - 4);
-                if (BitConverter.ToInt32(avi, index + 4).Equals(BitConverter.ToInt32(movi, 0))) {
-                    FindAll(index + 12, index + chunk.ckSize + 12);
+                CHUNK chunk = new CHUNK(Avi, index - 4);
+                if (BitConverter.ToInt32(Avi, index + 4).Equals(BitConverter.ToInt32(movi, 0))) {
+                    FindAll(index + 8, index + chunk.ckSize + 8);
                     break;
                 }
 
-                index = Find(LIST, index, avi.Length);
+                index = Find(LIST, index, Avi.Length);
             }
 
+        }
+
+        public void Search() {
+            SearchJunks();
+            SearchMoviList();
         }
 
         public int FindAll(int startIndex, int endIndex) {
@@ -101,17 +106,17 @@ namespace AVIStenography {
 
             int index = startIndex;
             while (index < endIndex) {
-                CHUNK chunk = new CHUNK(avi, index);
+                CHUNK chunk = new CHUNK(Avi, index);
 
                 if (BitConverter.GetBytes(chunk.ckID).Equals(LIST)) {
-                    if (BitConverter.ToInt32(avi, index + 8).Equals(BitConverter.ToInt32(REC, 0))) {
+                    if (BitConverter.ToInt32(Avi, index + 8).Equals(BitConverter.ToInt32(REC, 0))) {
                         index = FindAll(index + 8, index + 8 + chunk.ckSize);
                     }
                 }
                 else {
                     MoviList.TryGetValue(BitConverter.GetBytes(chunk.ckID), out items);
                     items?.Add(index);
-                    index += chunk.ckSize;
+                    index += chunk.ckSize + 8;
                 }
             }
 
@@ -137,11 +142,11 @@ namespace AVIStenography {
 
             Junks = new Dictionary<Int32, CHUNK>();
 
-            int index = Find(JUNK_CHUNK, 0, avi.Length);
+            int index = Find(JUNK_CHUNK, 0, Avi.Length);
             while (index > 0) {
-                CHUNK chunk = new CHUNK(avi, index - 4);
-                Junks.Add(index + 8, chunk);
-                index = Find(JUNK_CHUNK, index, avi.Length);
+                CHUNK chunk = new CHUNK(Avi, index - 4);
+                Junks.Add(index + 4, chunk);
+                index = Find(JUNK_CHUNK, index, Avi.Length);
             }
 
         }
@@ -154,7 +159,7 @@ namespace AVIStenography {
             while (!found && index < endIndex - searched.Length) {
                 found = true;
                 for (int i = 0; i < searched.Length; i++) {
-                    if (avi[index++] != searched[i]) {
+                    if (Avi[index++] != searched[i]) {
                         found = false;
                         break;
                     }

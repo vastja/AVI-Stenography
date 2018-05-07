@@ -8,7 +8,48 @@ namespace AVIStenography {
 
     static class StenogrpahyUtils {
 
-        public static string HideData(byte[] avi, int chunkDataStartIndex, int chunkDataSize, string message) {
+        public static void HideMessage(AVIFileHandler avifh, string message) {
+
+            var info = avifh.GetVideoStreamInfo();
+            if (info.Item1.cb == 0) {
+                IOUtils.ConsolePrintFailure();
+                Console.WriteLine("AVI file does not contain video stream header. Execution ABBORTED.");
+                Program.Exit(-1);
+            }
+
+            IOUtils.ConsolePrintSuccess();
+            Console.WriteLine("Start seaching in AVI file for CHUNKS.");
+            avifh.Search();
+            IOUtils.ConsolePrintSuccess();
+            Console.WriteLine("Searching in AVI file completed.");
+
+            Int32 junkSize = avifh.GetJunkChunksSize();
+            IOUtils.ConsolePrintSuccess();
+            Console.WriteLine($"Available free junk space: {junkSize}B");
+
+            if (IOUtils.ConsoleOption("Do you want to use JUNK CHUNKS?")) {
+                IOUtils.ConsolePrintSuccess();
+                Console.WriteLine("Start writing to JUNK CHUNKS.");
+                foreach (KeyValuePair<Int32, CHUNK> kvp in avifh.Junks) {
+                    if (message.Length > 0) {
+                        message = HideData(avifh.Avi, kvp.Key, kvp.Value.ckSize, message);
+                    }
+                }
+                IOUtils.ConsolePrintSuccess();
+                Console.WriteLine("Writing to JUNK CHUNKS completed.");
+            }
+
+            IOUtils.Save("JUNK-TEST.avi",avifh.Avi);
+
+        }
+
+        //public string ExtractMessage(AVIFileHandler avifh) {
+
+        //    string message;
+
+        //}
+
+        private static string HideData(byte[] avi, int chunkDataStartIndex, int chunkDataSize, string message) {
 
             byte letter, code;
 
@@ -30,7 +71,7 @@ namespace AVIStenography {
 
         }
 
-        public static bool ExtractData(byte[] avi, int chunkDataStartIndex, int chunkDataSize, string message) {
+        private static bool ExtractData(byte[] avi, int chunkDataStartIndex, int chunkDataSize, string message) {
 
             StringBuilder sb = new StringBuilder();
 
