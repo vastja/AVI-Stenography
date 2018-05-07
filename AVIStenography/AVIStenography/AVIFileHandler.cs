@@ -25,23 +25,20 @@ namespace AVIStenography {
         private static readonly byte[] hdrl = new byte[] { 0x68, 0x64, 0x72, 0x6c };
         private static readonly byte[] avih = new byte[] { 0x61, 0x76, 0x69, 0x68 };
         private static readonly byte[] strl = new byte[] { 0x73, 0x74, 0x72, 0x6c };
+        private static readonly byte[] strh = new byte[] { 0x73, 0x74, 0x72, 0x68 };
         private static readonly byte[] strf = new byte[] { 0x73, 0x74, 0x72, 0x66 };
         private static readonly byte[] movi = new byte[] { 0x6d, 0x6f, 0x76, 0x69 }; // movi
 
         private static readonly byte[] auds = new byte[] { 0x61, 0x75, 0x64, 0x73 };
         private static readonly byte[] vids = new byte[] { 0x76, 0x69, 0x64, 0x73 };
 
-
-        private Dictionary<byte[], List<Int32>> moviList;
-        private Dictionary<Int32, CHUNK> junks;
+        public Dictionary<byte[], List<Int32>> MoviList { get; protected set; }
+        public Dictionary<Int32, CHUNK> Junks { get; protected set; }
 
         private byte[] avi;
 
         public AVIFileHandler(byte[] avi) {
             this.avi = avi;
-
-            int index = Find(strf, 0, avi.Length);
-            BITMAPINFOHEADER bih = new BITMAPINFOHEADER(avi, index);
         }
 
         public UInt32 GetRIFFFileSize() {
@@ -60,9 +57,26 @@ namespace AVIStenography {
             return new AVIMAINHEADER(avi, index);
         }
 
+        public (AVISTREAMHEADER, BITMAPINFOHEADER) GetVideoStreamInfo() {
+
+            int index = Find(strh, 0, avi.Length);
+            while (index > 0) {
+                AVISTREAMHEADER avish = new AVISTREAMHEADER(avi, index - 4);
+
+                if (avish.fccType.Equals(BitConverter.ToUInt32(vids, 0))) {
+                    BITMAPINFOHEADER bih = new BITMAPINFOHEADER(avi, index + 12 + (int) avish.cb);
+                    return (avish, bih);
+                }
+
+                index = Find(strh, 0, avi.Length);
+            }
+
+            return (new AVISTREAMHEADER(), new BITMAPINFOHEADER());
+        }
+
         public void SearchMoviList() {
 
-            moviList = new Dictionary<byte[], List<Int32>> {
+            MoviList = new Dictionary<byte[], List<Int32>> {
                 { VIDEO_CHUNK_COMPRESSED, new List<Int32>()},
                 { VIDEO_CHUNK_UNCOMPRESSED, new List<Int32>()},
                 { AUDIO_CHUNK, new List<Int32>()},
@@ -95,7 +109,7 @@ namespace AVIStenography {
                     }
                 }
                 else {
-                    moviList.TryGetValue(BitConverter.GetBytes(chunk.ckID), out items);
+                    MoviList.TryGetValue(BitConverter.GetBytes(chunk.ckID), out items);
                     items?.Add(index);
                     index += chunk.ckSize;
                 }
@@ -108,29 +122,25 @@ namespace AVIStenography {
         public Int32 GetJunkChunksSize() {
             Int32 size = 0;
 
-            if (junks == null) {
-                SearcheJunks();
+            if (Junks == null) {
+                SearchJunks();
             }
 
-            foreach (CHUNK chunk in junks.Values) {
+            foreach (CHUNK chunk in Junks.Values) {
                 size += chunk.ckSize;
             }
 
             return size;
         }
 
-        public Dictionary<Int32, CHUNK> GetJunks() {
-            return junks;
-        }
+        private void SearchJunks() {
 
-        private void SearcheJunks() {
-
-            junks = new Dictionary<Int32, CHUNK>();
+            Junks = new Dictionary<Int32, CHUNK>();
 
             int index = Find(JUNK_CHUNK, 0, avi.Length);
             while (index > 0) {
                 CHUNK chunk = new CHUNK(avi, index - 4);
-                junks.Add(index + 8, chunk);
+                Junks.Add(index + 8, chunk);
                 index = Find(JUNK_CHUNK, index, avi.Length);
             }
 
@@ -162,7 +172,7 @@ namespace AVIStenography {
         public Int16 left;
         public Int16 top;
         public Int16 right;
-        public Int32 bottom;
+        public Int16 bottom;
 
         public RCFRAME(byte[] avi, int index) {
             left = BitConverter.ToInt16(avi, index);
@@ -176,8 +186,8 @@ namespace AVIStenography {
         public UInt32 biSize;
         public Int32 biWidth;
         public Int32 biHeight;
-        public Int16 biPlanes;
-        public Int16 biBitCount;
+        public UInt16 biPlanes;
+        public UInt16 biBitCount;
         public UInt32 biCompression;
         public UInt32 biSizeImage;
         public Int32 biXPelsPerMeter;
@@ -189,8 +199,8 @@ namespace AVIStenography {
             biSize = BitConverter.ToUInt32(avi, index);
             biWidth = BitConverter.ToInt32(avi, index + 4);
             biHeight = BitConverter.ToInt32(avi, index + 8);
-            biPlanes = BitConverter.ToInt16(avi, index + 12);
-            biBitCount = BitConverter.ToInt16(avi, index + 14);
+            biPlanes = BitConverter.ToUInt16(avi, index + 12);
+            biBitCount = BitConverter.ToUInt16(avi, index + 14);
             biCompression = BitConverter.ToUInt32(avi, index + 16);
             biSizeImage = BitConverter.ToUInt32(avi, index + 20);
             biXPelsPerMeter = BitConverter.ToInt32(avi, index + 24);
@@ -238,7 +248,7 @@ namespace AVIStenography {
 
     public struct AVISTREAMHEADER {
         public UInt32 fcc;
-        public Int32 cb;
+        public UInt32 cb;
         public UInt32 fccType;
         public UInt32 fccHandler;
         public UInt32 dwFlags;
@@ -257,7 +267,7 @@ namespace AVIStenography {
 
         public AVISTREAMHEADER(byte[] avi, int index) {
             fcc = BitConverter.ToUInt32(avi, index);
-            cb = BitConverter.ToInt32(avi, index + 4);
+            cb = BitConverter.ToUInt32(avi, index + 4);
             fccType = BitConverter.ToUInt32(avi, index + 8);
             fccHandler = BitConverter.ToUInt32(avi, index + 12);
             dwFlags = BitConverter.ToUInt32(avi, index + 16);
@@ -277,18 +287,18 @@ namespace AVIStenography {
 
     struct BITMAPFILEHEADER {
 
-        public Int16 bfType;
-        public Int32 bfSize;
-        public Int16 bfReserved1;
-        public Int16 bfReserved2;
-        public Int32 bfOffBits;
+        public UInt16 bfType;
+        public UInt32 bfSize;
+        public UInt16 bfReserved1;
+        public UInt16 bfReserved2;
+        public UInt32 bfOffBits;
 
         public BITMAPFILEHEADER(byte[] avi, int index) {
-            bfType = BitConverter.ToInt16(avi, index);
-            bfSize = BitConverter.ToInt16(avi, index + 2);
-            bfReserved1 = BitConverter.ToInt16(avi, index + 6);
-            bfReserved2 = BitConverter.ToInt16(avi, index + 8);
-            bfOffBits = BitConverter.ToInt16(avi, index + 10);
+            bfType = BitConverter.ToUInt16(avi, index);
+            bfSize = BitConverter.ToUInt32(avi, index + 2);
+            bfReserved1 = BitConverter.ToUInt16(avi, index + 6);
+            bfReserved2 = BitConverter.ToUInt16(avi, index + 8);
+            bfOffBits = BitConverter.ToUInt32(avi, index + 10);
         }
     }
 

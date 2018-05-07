@@ -14,7 +14,7 @@ namespace AVIStenography {
 
         static void Main(string[] args) {
 
-            byte[] avi = IOUtils.Load("Klid-a-pohoda.avi");
+            byte[] avi = IOUtils.Load("For-the-birds.avi");
             if (avi == null) {
                 Exit(-1);
             }
@@ -22,6 +22,8 @@ namespace AVIStenography {
             AVIFileHandler handler = new AVIFileHandler(avi);
 
             AVIMAINHEADER avih = handler.GetAVIMainHeader();
+
+            var info = handler.GetVideoStreamInfo();
 
 
             Int32 junkSize = handler.GetJunkChunksSize();
