@@ -6,50 +6,62 @@ using System.Threading.Tasks;
 
 namespace AVIStenography {
 
+    /// <summary>
+    /// Stenography tools
+    /// </summary>
     static class StenogrpahyUtils {
 
+        /// <summary>
+        /// End sequence for end message detection for extracting tool
+        /// </summary>
+        public static readonly char MESSAGE_END = (char) 0x03;
 
-        private static char MESSAGE_END = (char) 0x03;
 
-        public static void HideMessage(AVIFileHandler avifh, string message, bool force, IEnumerable<Options.DataTypes> hideTo) {
-
-            (Int32, Int32, Int32, Int32) chunkSizes = GetStreamsAvailableChunksSize(avifh);
-            Console.WriteLine($"Available free junk space: {chunkSizes.Item1}B");
-            Console.WriteLine($"Available free video space: {chunkSizes.Item2 + chunkSizes.Item3}B");
-            Console.WriteLine($"Available free audio space: {chunkSizes.Item4}B");
-
+        /// <summary>
+        /// Hides message into .avi file
+        /// </summary>
+        /// <param name="avifh">.avi file handler</param>
+        /// <param name="message">String to hide</param>
+        /// <param name="force">Hide into compressed streams</param>
+        /// <param name="hideTo">List of streams the message will be hidden into (in given order)</param>
+        /// <returns>True if message was hide successfuly else false</returns>
+        public static bool HideMessage(AVIFileHandler avifh, string message, bool force, IEnumerable<Options.DataTypes> hideTo) {
+  
             message += MESSAGE_END;
-            //TODO check if there is enough space
+            
+            if (!CheckAvailableSpace(avifh, message, hideTo)) {
+                return false;
+            }
+
             foreach (Options.DataTypes type in hideTo) {
 
                 Dictionary<Int32, CHUNK> chunks;
 
-                if (type == Options.DataTypes.vids && avifh.AviVideoStreamInfo.Item1.dwQuality != 10000) {
-                    IOUtils.ConsolePrintWarning();
-                    if (force) {
-                        Console.WriteLine("Writing to compressed video stream");
-                    }
-                    else {
-                        Console.WriteLine("Video stream was skipped due its compression. Writing to compressed video stream can be enable with --force flag.");
-                        continue;
-                    }
-                }
-
+                if (CheckCompression(avifh.IsStreamUncompressed(type), force, type)) {
                     if (avifh.Chunks.TryGetValue(AVIFileHandler.GetChunkName(type), out chunks)) {
 
                         foreach (KeyValuePair<Int32, CHUNK> kvp in chunks) {
                             message = HideData(avifh.Avi, kvp.Key, kvp.Value.ckSize, message);
                             if (message == null) {
-                                return;
+                                return true;
                             }
                         }
 
                     }
+                }
 
             }
+
+            return false;
             
         }
 
+        /// <summary>
+        /// Extracts hidden message from .avi file
+        /// </summary>
+        /// <param name="avifh">.avi file handler</param>
+        /// <param name="extractFrom">List of streams the message will be extracted from (in given order)</param>
+        /// <returns>Extracted message</returns>
         public static string ExtractMessage(AVIFileHandler avifh, IEnumerable<Options.DataTypes> extractFrom) {
 
             string message = "";
@@ -71,6 +83,14 @@ namespace AVIStenography {
 
         }
 
+        /// <summary>
+        /// Hide part of message (as much as possible) into given chunk
+        /// </summary>
+        /// <param name="avi">.avi file handler</param>
+        /// <param name="chunkDataStartIndex">Index of data part of chunk</param>
+        /// <param name="chunkDataSize">Chunk's data size</param>
+        /// <param name="message">Message to hide</param>
+        /// <returns>Rest of message (in case message is larger then data chunk's size)</returns>
         private static string HideData(byte[] avi, int chunkDataStartIndex, int chunkDataSize, string message) {
 
             byte letter, code;
@@ -93,6 +113,14 @@ namespace AVIStenography {
 
         }
 
+        /// <summary>
+        /// Extract part of message (as much as possible) from given chunk
+        /// </summary>
+        /// <param name="avi">.avi file handler</param>
+        /// <param name="chunkDataStartIndex">Index of data part of chunk</param>
+        /// <param name="chunkDataSize">Chunk's data size</param>
+        /// <param name="message">Already extracted message</param>
+        /// <returns>True in case end of message (MESSAGE_END) was reached else false</returns>
         private static bool ExtractData(byte[] avi, int chunkDataStartIndex, int chunkDataSize, ref string message) {
 
             StringBuilder sb = new StringBuilder();
@@ -124,6 +152,11 @@ namespace AVIStenography {
 
         }
 
+        /// <summary>
+        /// Counts available space for data hiding of given avi stream type
+        /// </summary>
+        /// <param name="chunks">Chunks of one avi stream type</param>
+        /// <returns>Available space in bytes</returns>
         private static int GetAvailableSize(Dictionary<Int32, CHUNK> chunks) {
             int size = 0;
             foreach (CHUNK chunk in chunks.Values) {
@@ -132,6 +165,11 @@ namespace AVIStenography {
             return size;
         }
 
+        /// <summary>
+        /// Counts available space for data hiding of all supported avi stream types
+        /// </summary>
+        /// <param name="avifh">.avi file handler</param>
+        /// <returns>(Junk available size, Audio available size, Compressed video available size, Uncompressed video available size)</returns>
         public static (int, int, int, int) GetStreamsAvailableChunksSize(AVIFileHandler avifh) {
             Int32 junkSize = 0, vidsCompressSize = 0, vidsUncompressedSize = 0, audsSize = 0;
 
@@ -150,6 +188,49 @@ namespace AVIStenography {
             }
 
             return (junkSize, vidsUncompressedSize, vidsCompressSize, audsSize);
+        }
+
+        /// <summary>
+        /// Checks if there is enough free space to hide message
+        /// </summary>
+        /// <param name="avifh">.avi file handler</param>
+        /// <param name="message">Message to hide</param>
+        /// <param name="streams">List of stream for message hiding</param>
+        /// <returns>true if there is enough space for message hiding else false</returns>
+        private static bool CheckAvailableSpace(AVIFileHandler avifh, string message, IEnumerable<Options.DataTypes> streams) {
+
+            (Int32, Int32, Int32, Int32) chunkSizes = GetStreamsAvailableChunksSize(avifh);
+            Console.WriteLine($"Available free junk space: {chunkSizes.Item1}B");
+            Console.WriteLine($"Available free video space: {chunkSizes.Item2 + chunkSizes.Item3}B");
+            Console.WriteLine($"Available free audio space: {chunkSizes.Item4}B");
+
+            int[] sizes = new int[3] { chunkSizes.Item1, chunkSizes.Item2 + chunkSizes.Item3, chunkSizes.Item4};
+
+            int size = 0;
+            foreach (int type in streams) {
+                size += sizes[type];
+            }
+
+            return size / 8 > message.Length;
+
+        }
+
+        private static bool CheckCompression(bool compression, bool force, Options.DataTypes type) {
+
+            if (compression && force) {
+                IOUtils.ConsolePrintWarning();
+                Console.WriteLine($"Writing to compressed {type} strem due to force.");
+                return true;
+            }
+            else if (compression) {
+                IOUtils.ConsolePrintWarning();
+                Console.WriteLine($"Writing to compressed {type} is not allowed. See --force flag to enable writing to compressed streams.");
+                return false;
+            }
+            else {
+                return true;
+            }
+
         }
 
     }

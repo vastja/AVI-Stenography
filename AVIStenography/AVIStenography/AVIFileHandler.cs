@@ -7,9 +7,18 @@ using System.IO;
 
 namespace AVIStenography {
 
-
-
+    /// <summary>
+    /// Handle .avi file
+    /// <see href="https://msdn.microsoft.com/en-us/library/windows/desktop/dd318189(v=vs.85).aspx"></see>
+    /// <see href="https://cdn.hackaday.io/files/274271173436768/avi.pdf"></see>
+    /// </summary>
     class AVIFileHandler {
+
+        /*
+        * AVI FILE TYPES
+        * see https://msdn.microsoft.com/en-us/library/windows/desktop/dd318189(v=vs.85).aspx and 
+        * https://cdn.hackaday.io/files/274271173436768/avi.pdf for specification
+        */
 
         public static readonly Int32 VIDEO_CHUNK_COMPRESSED = 25444; // dc
         public static readonly Int32 VIDEO_CHUNK_UNCOMPRESSED = 25188; //db
@@ -27,7 +36,7 @@ namespace AVIStenography {
         private static readonly byte[] strl = new byte[] { 0x73, 0x74, 0x72, 0x6c };
         private static readonly byte[] strh = new byte[] { 0x73, 0x74, 0x72, 0x68 };
         private static readonly byte[] strf = new byte[] { 0x73, 0x74, 0x72, 0x66 };
-        private static readonly byte[] movi = new byte[] { 0x6d, 0x6f, 0x76, 0x69 }; // movi
+        private static readonly byte[] movi = new byte[] { 0x6d, 0x6f, 0x76, 0x69 };
 
         private static readonly byte[] auds = new byte[] { 0x61, 0x75, 0x64, 0x73 };
         private static readonly byte[] vids = new byte[] { 0x76, 0x69, 0x64, 0x73 };
@@ -40,8 +49,12 @@ namespace AVIStenography {
         public AVIMAINHEADER AviMainHeader { get; protected set; }
         public (AVISTREAMHEADER, BITMAPINFOHEADER) AviVideoStreamInfo { get; protected set; }
 
-        // public AVISTREAMHEADER AviAudioStreamInfo { get; protected set; }
+        public AVISTREAMHEADER AviAudioStreamInfo { get; protected set; }
 
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="avi">byte representation of .avi file</param>
         public AVIFileHandler(byte[] avi) {
             Avi = avi;
 
@@ -61,6 +74,13 @@ namespace AVIStenography {
                 Program.Exit(-1);
             }
 
+            AviAudioStreamInfo = GetAudioStreamInfo();
+            if (AviAudioStreamInfo.cb == 0) {
+                IOUtils.ConsolePrintFailure();
+                Console.WriteLine("AVI file does not contain audio stream header. Execution ABBORTED.");
+                Program.Exit(-1);
+            }
+
             IOUtils.ConsolePrintSuccess();
             Console.WriteLine("Start seaching in AVI file for CHUNKS.");
             Search();
@@ -69,9 +89,13 @@ namespace AVIStenography {
 
         }
 
+        /// <summary>
+        /// Options.DataType to Int32 code convertor
+        /// </summary>
+        /// <param name="type">Chunk type</param>
+        /// <returns>Int32 code for given chunk type</returns>
         public static Int32 GetChunkName(Options.DataTypes type) {
 
-            //TODO add uncompressed vidoe chunk to DataTypes
             switch (type) {
                 case Options.DataTypes.junk: return JUNK_CHUNK;
                 case Options.DataTypes.vids: return VIDEO_CHUNK_COMPRESSED;
@@ -81,6 +105,7 @@ namespace AVIStenography {
 
         }
 
+        /// <returns>Size of RIFF (.avi) file</returns>
         public UInt32 GetRIFFFileSize() {
             return BitConverter.ToUInt32(Avi, 4);
         }
@@ -114,7 +139,26 @@ namespace AVIStenography {
             return (new AVISTREAMHEADER(), new BITMAPINFOHEADER());
         }
 
-        public void SearchMoviList() {
+        public AVISTREAMHEADER GetAudioStreamInfo() {
+
+            int index = Find(strh, 0, Avi.Length);
+            while (index > 0) {
+                AVISTREAMHEADER avish = new AVISTREAMHEADER(Avi, index - 4);
+
+                if (avish.fccType.Equals(BitConverter.ToUInt32(auds, 0))) {
+                    return avish;
+                }
+
+                index = Find(strh, 0, Avi.Length);
+            }
+
+            return new AVISTREAMHEADER();
+        }
+
+        /// <summary>
+        /// Searches chunks in movi list 
+        /// </summary>
+        private void SearchMoviList() {
                      
             int index = Find(LIST, 0, Avi.Length);
             while (index > 0) {
@@ -129,12 +173,21 @@ namespace AVIStenography {
 
         }
 
-        public void Search() {
+        /// <summary>
+        /// Searches .avi file for chunks
+        /// </summary>
+        private void Search() {
             SearchMoviList();
             SearchJunks();
         }
 
-        public int FindAll(int startIndex, int endIndex) {
+        /// <summary>
+        /// Searches for chunks
+        /// </summary>
+        /// <param name="startIndex">Searching starts from this index</param>
+        /// <param name="endIndex">Searching ends at this index</param>
+        /// <returns>Index where searching ended</returns>
+        private int FindAll(int startIndex, int endIndex) {
 
             Dictionary<Int32, CHUNK> items;
             byte[] chunkId = new byte[2];
@@ -164,7 +217,11 @@ namespace AVIStenography {
 
         }
 
-
+        /// <summary>
+        /// Counts size of given avi stream type
+        /// </summary>
+        /// <param name="chunks">Chunks of one avi stream type</param>
+        /// <returns>Size in bytes</returns>
         private int GetSize(Dictionary<Int32, CHUNK> chunks) {
             int size = 0;
             foreach (CHUNK chunk in chunks.Values) {
@@ -173,6 +230,11 @@ namespace AVIStenography {
             return size;
         }
 
+        /// <summary>
+        /// Counts size of all supported avi stream types
+        /// </summary>
+        /// <param name="avifh">.avi file handler</param>
+        /// <returns>(Junk size, Audio size, Compressed vide size, Uncompressed video size)</returns>
         public (int, int, int, int) GetStreamsChunksSize() {
             Int32 junkSize = 0, vidsCompressSize = 0, vidsUncompressedSize = 0, audsSize = 0;
 
@@ -193,6 +255,9 @@ namespace AVIStenography {
             return (junkSize, vidsUncompressedSize, vidsCompressSize, audsSize);
         }
 
+        /// <summary>
+        /// Seraches for all junk chunks in .avi file
+        /// </summary>
         private void SearchJunks() {
 
             Dictionary<Int32, CHUNK> junks;
@@ -207,6 +272,13 @@ namespace AVIStenography {
 
         }
 
+        /// <summary>
+        /// Finds given byte sequence in .avi file
+        /// </summary>
+        /// <param name="searched">Searched byte sequence</param>
+        /// <param name="startIndex">Searching starts from this index</param>
+        /// <param name="endIndex">Searching ends at this index</param>
+        /// <returns>Index of last byte in sequence in case sequence were found else -1</returns>
         private int Find(byte[] searched, int startIndex, int endIndex) {
 
             bool found = false;
@@ -226,8 +298,24 @@ namespace AVIStenography {
 
         }
 
+        public bool IsStreamUncompressed(Options.DataTypes type) {
+
+            switch (type) {
+                case Options.DataTypes.auds: return AviAudioStreamInfo.dwQuality == 10000;
+                case Options.DataTypes.vids: return AviVideoStreamInfo.Item1.dwQuality == 10000;
+                default: return true;
+            }
+
+        }
+
     }
 
+    
+
+    /*
+     * AVI FILE STRUCTURES
+     * see https://msdn.microsoft.com/ for specification
+     */
 
     public struct RCFRAME {
         public Int16 left;

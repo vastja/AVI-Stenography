@@ -7,8 +7,16 @@ using System.IO;
 
 namespace AVIStenography {
 
+    /// <summary>
+    /// IO tools
+    /// </summary>
     static class IOUtils {
 
+        /// <summary>
+        /// Loads given .avi file as byte array
+        /// </summary>
+        /// <param name="filePath">Path to .avi file</param>
+        /// <returns>.avi file as byte array</returns>
         public static byte[] LoadAvi(string filePath) {
             try {
                 byte[] avi = File.ReadAllBytes(filePath);
@@ -23,6 +31,11 @@ namespace AVIStenography {
             }
         }
 
+        /// <summary>
+        /// Loads text of given file
+        /// </summary>
+        /// <param name="filePath">Path to file</param>
+        /// <returns>Text of given file</returns>
         public static string LoadMessage(string filePath) {
             try {
                 string message = File.ReadAllText(filePath);
@@ -37,6 +50,11 @@ namespace AVIStenography {
             }
         }
 
+        /// <summary>
+        /// Saves byte array into .avi file
+        /// </summary>
+        /// <param name="filePath">Path to .avi file</param>
+        /// <param name="data">Byte array for saving</param>
         public static void SaveAvi(string filePath, byte[] data) {
             try {
                 File.WriteAllBytes(filePath, data);
@@ -73,27 +91,18 @@ namespace AVIStenography {
             Console.Write(" ] ");
         }
 
-        public static bool ConsoleOption(string text) {
-            Console.WriteLine(text);
+        //public static bool ConsoleOption(string text) {
+        //    Console.WriteLine(text);
 
-            Char key;
-            do {
-                Console.WriteLine("Press 'Y' to continue or 'N' to abort.");
-                key = Console.ReadKey().KeyChar;
-            } while (!(key == 'y' || key == 'n' || key == 'Y' || key == 'N'));
-            Console.WriteLine();
+        //    Char key;
+        //    do {
+        //        Console.WriteLine("Press 'Y' to continue or 'N' to abort.");
+        //        key = Console.ReadKey().KeyChar;
+        //    } while (!(key == 'y' || key == 'n' || key == 'Y' || key == 'N'));
+        //    Console.WriteLine();
 
-            return key == 'y' || key == 'Y' ? true : false;
-        }
-
-        public static void ConsolePrintHelp() {
-
-            Console.WriteLine("Usage: avis.exe < <-E> | <-H> > <file_path.avi> [-f] <message> [--force] ");
-            Console.WriteLine();
-            Console.WriteLine("Options: ");
-            Console.WriteLine("-E\t\tExtract hidden message.\n-H\t\tHide message.\n-f\t\tMessage will be loaded from file.\n--force\t\tHide message even if avi file is compressed.");
-
-        }
+        //    return key == 'y' || key == 'Y' ? true : false;
+        //}
 
     }
 

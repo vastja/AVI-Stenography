@@ -8,7 +8,10 @@ using CommandLine;
 
 namespace AVIStenography {
 
-
+    /// <summary>
+    /// Command line arguments see CommandLineParser
+    /// <see href="https://github.com/commandlineparser/commandline.git"></see>
+    /// </summary>
     class Options {
 
         public enum Actions {extract, hide};
@@ -23,18 +26,20 @@ namespace AVIStenography {
         [Value(2, Required = true)]
         public string Message { get; set; }
 
-        [Option("force", Required = false, Default = false)]
+        [Option('f',"force", Required = false, Default = false)]
         public bool Force { get; set; }
 
-        [Option("used", Required = false, Separator = ',', Min = 1, Max = 3, Default = new DataTypes[] { DataTypes.junk, DataTypes.vids, DataTypes.auds })]
+        [Option('u',"used", Required = false, Separator = ',', Min = 1, Max = 3, Default = new DataTypes[] { DataTypes.junk, DataTypes.vids, DataTypes.auds })]
         public IEnumerable<DataTypes> Used { get; set; }
 
-        [Option("output-file", Required = false, Default = "temp.avi")]
+        [Option('o', "output-file", Required = false, Default = "temp.avi")]
         public string OutputFilePath { get; set; }
 
     }
 
-
+    /// <summary>
+    /// Controls program data flow
+    /// </summary>
     class Program {
 
         static void Main(string[] args) {
@@ -48,6 +53,11 @@ namespace AVIStenography {
 
         }
 
+        /// <summary>
+        /// Command line parser success handler
+        /// <see href="https://github.com/commandlineparser/commandline.git"></see>
+        /// </summary>
+        /// <param name="options">Parsed options</param>
         public static void RunOptionsAndReturnExitCode(Options options) {
 
             byte[] avi = IOUtils.LoadAvi(options.FilePath);
@@ -80,10 +90,19 @@ namespace AVIStenography {
 
         }
 
+        /// <summary>
+        /// Command line parser error handler
+        /// <see href="https://github.com/commandlineparser/commandline.git"></see>
+        /// </summary>
+        /// <param name="error">Parser error</param>
         public static void HandleParseError(IEnumerable<Error> error) {
             // TODO
         }
 
+        /// <summary>
+        /// Application ending handler
+        /// </summary>
+        /// <param name="code">Exit code</param>
         public static void Exit(int code) {
             Console.ReadKey();
             Environment.Exit(code);
