@@ -9,7 +9,7 @@ namespace AVIStenography {
 
     static class IOUtils {
 
-        public static byte[] Load(string filePath) {
+        public static byte[] LoadAvi(string filePath) {
             try {
                 byte[] avi = File.ReadAllBytes(filePath);
                 ConsolePrintSuccess();
@@ -23,7 +23,21 @@ namespace AVIStenography {
             }
         }
 
-        public static void Save(string filePath, byte[] data) {
+        public static string LoadMessage(string filePath) {
+            try {
+                string message = File.ReadAllText(filePath);
+                ConsolePrintSuccess();
+                Console.WriteLine($"{filePath} loading.");
+                return message;
+            }
+            catch (IOException) {
+                ConsolePrintFailure();
+                Console.WriteLine($"{filePath} loading.");
+                return null;
+            }
+        }
+
+        public static void SaveAvi(string filePath, byte[] data) {
             try {
                 File.WriteAllBytes(filePath, data);
                 ConsolePrintSuccess();
@@ -32,10 +46,6 @@ namespace AVIStenography {
             catch (IOException e) {
                 ConsolePrintFailure();
                 Console.WriteLine($"Saving data to {filePath}");
-
-                ConsolePrintWarning();
-                Console.WriteLine("Saving data to current directory as TEMP.avi");
-                File.WriteAllBytes("TEMP.avi", data);
             }
         }
 
@@ -74,6 +84,15 @@ namespace AVIStenography {
             Console.WriteLine();
 
             return key == 'y' || key == 'Y' ? true : false;
+        }
+
+        public static void ConsolePrintHelp() {
+
+            Console.WriteLine("Usage: avis.exe < <-E> | <-H> > <file_path.avi> [-f] <message> [--force] ");
+            Console.WriteLine();
+            Console.WriteLine("Options: ");
+            Console.WriteLine("-E\t\tExtract hidden message.\n-H\t\tHide message.\n-f\t\tMessage will be loaded from file.\n--force\t\tHide message even if avi file is compressed.");
+
         }
 
     }

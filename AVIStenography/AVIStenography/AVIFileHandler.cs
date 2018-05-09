@@ -11,12 +11,12 @@ namespace AVIStenography {
 
     class AVIFileHandler {
 
-        public static readonly byte[] VIDEO_CHUNK_COMPRESSED = new byte[] { 0x64, 0x63 }; // dc
-        public static readonly byte[] VIDEO_CHUNK_UNCOMPRESSED = new byte[] { 0x64, 0x62 }; //db
-        public static readonly byte[] AUDIO_CHUNK = new byte[] { 0x77, 0x62 }; //wb
-        public static readonly byte[] JUNK_CHUNK = new byte[] { 0x4a, 0x55, 0x4e, 0x4b }; //JUNK
+        public static readonly Int32 VIDEO_CHUNK_COMPRESSED = 25444; // dc
+        public static readonly Int32 VIDEO_CHUNK_UNCOMPRESSED = 25188; //db
+        public static readonly Int32 AUDIO_CHUNK = 25207; //wb
+        public static readonly Int32 JUNK_CHUNK = 1263424842; //JUNK
 
-
+        public static readonly byte[] JUNK = new byte[] { 0x4a, 0x55, 0x4e, 0x4b };
         private static readonly byte[] RIFF = new byte[] { 0x52, 0x49, 0x46, 0x46 };
         private static readonly byte[] LIST = new byte[] { 0x4c, 0x49, 0x53, 0x54 };
 
@@ -32,13 +32,53 @@ namespace AVIStenography {
         private static readonly byte[] auds = new byte[] { 0x61, 0x75, 0x64, 0x73 };
         private static readonly byte[] vids = new byte[] { 0x76, 0x69, 0x64, 0x73 };
 
-        public Dictionary<byte[], List<Int32>> MoviList { get; protected set; }
-        public Dictionary<Int32, CHUNK> Junks { get; protected set; }
+        public Dictionary<Int32, Dictionary<Int32, CHUNK>> Chunks { get; protected set; }
 
         public byte[] Avi { get; protected set; }
 
+
+        public AVIMAINHEADER AviMainHeader { get; protected set; }
+        public (AVISTREAMHEADER, BITMAPINFOHEADER) AviVideoStreamInfo { get; protected set; }
+
+        // public AVISTREAMHEADER AviAudioStreamInfo { get; protected set; }
+
         public AVIFileHandler(byte[] avi) {
             Avi = avi;
+
+            Chunks = new Dictionary<Int32, Dictionary<Int32, CHUNK>> {
+                { JUNK_CHUNK, new Dictionary<Int32, CHUNK>()},
+                { VIDEO_CHUNK_COMPRESSED, new Dictionary<Int32, CHUNK>()},
+                { VIDEO_CHUNK_UNCOMPRESSED, new Dictionary<Int32, CHUNK>()},
+                { AUDIO_CHUNK, new Dictionary<Int32, CHUNK>()},
+            };
+
+            AviMainHeader = GetAVIMainHeader();
+
+            AviVideoStreamInfo = GetVideoStreamInfo();
+            if (AviVideoStreamInfo.Item1.cb == 0) {
+                IOUtils.ConsolePrintFailure();
+                Console.WriteLine("AVI file does not contain video stream header. Execution ABBORTED.");
+                Program.Exit(-1);
+            }
+
+            IOUtils.ConsolePrintSuccess();
+            Console.WriteLine("Start seaching in AVI file for CHUNKS.");
+            Search();
+            IOUtils.ConsolePrintSuccess();
+            Console.WriteLine("Searching in AVI file completed.");
+
+        }
+
+        public static Int32 GetChunkName(Options.DataTypes type) {
+
+            //TODO add uncompressed vidoe chunk to DataTypes
+            switch (type) {
+                case Options.DataTypes.junk: return JUNK_CHUNK;
+                case Options.DataTypes.vids: return VIDEO_CHUNK_COMPRESSED;
+                case Options.DataTypes.auds: return AUDIO_CHUNK;
+                default: return -1;
+            }
+
         }
 
         public UInt32 GetRIFFFileSize() {
@@ -75,13 +115,7 @@ namespace AVIStenography {
         }
 
         public void SearchMoviList() {
-
-            MoviList = new Dictionary<byte[], List<Int32>> {
-                { VIDEO_CHUNK_COMPRESSED, new List<Int32>()},
-                { VIDEO_CHUNK_UNCOMPRESSED, new List<Int32>()},
-                { AUDIO_CHUNK, new List<Int32>()},
-            };
-
+                     
             int index = Find(LIST, 0, Avi.Length);
             while (index > 0) {
                 CHUNK chunk = new CHUNK(Avi, index - 4);
@@ -96,13 +130,14 @@ namespace AVIStenography {
         }
 
         public void Search() {
-            SearchJunks();
             SearchMoviList();
+            SearchJunks();
         }
 
         public int FindAll(int startIndex, int endIndex) {
 
-            List<Int32> items;
+            Dictionary<Int32, CHUNK> items;
+            byte[] chunkId = new byte[2];
 
             int index = startIndex;
             while (index < endIndex) {
@@ -114,9 +149,14 @@ namespace AVIStenography {
                     }
                 }
                 else {
-                    MoviList.TryGetValue(BitConverter.GetBytes(chunk.ckID), out items);
-                    items?.Add(index);
+                    Array.Copy(BitConverter.GetBytes(chunk.ckID), 2, chunkId, 0, 2);
+                    Chunks.TryGetValue(BitConverter.ToInt16(chunkId, 0), out items);
+                    items?.Add(index + 8, chunk);
                     index += chunk.ckSize + 8;
+
+                    if (index % 2 != 0) {
+                        index++;
+                    }
                 }
             }
 
@@ -124,29 +164,45 @@ namespace AVIStenography {
 
         }
 
-        public Int32 GetJunkChunksSize() {
-            Int32 size = 0;
 
-            if (Junks == null) {
-                SearchJunks();
-            }
-
-            foreach (CHUNK chunk in Junks.Values) {
+        private int GetSize(Dictionary<Int32, CHUNK> chunks) {
+            int size = 0;
+            foreach (CHUNK chunk in chunks.Values) {
                 size += chunk.ckSize;
             }
-
             return size;
+        }
+
+        public (int, int, int, int) GetStreamsChunksSize() {
+            Int32 junkSize = 0, vidsCompressSize = 0, vidsUncompressedSize = 0, audsSize = 0;
+
+            Dictionary<Int32, CHUNK> chunkType;
+            if (Chunks.TryGetValue(JUNK_CHUNK, out chunkType)) {
+                junkSize = GetSize(chunkType);
+            }
+            if (Chunks.TryGetValue(AUDIO_CHUNK, out chunkType)) {
+                audsSize = GetSize(chunkType);
+            }
+            if (Chunks.TryGetValue(VIDEO_CHUNK_COMPRESSED, out chunkType)) {
+                vidsCompressSize = GetSize(chunkType);
+            }
+            if (Chunks.TryGetValue(VIDEO_CHUNK_UNCOMPRESSED, out chunkType)) {
+                vidsUncompressedSize = GetSize(chunkType);
+            }
+
+            return (junkSize, vidsUncompressedSize, vidsCompressSize, audsSize);
         }
 
         private void SearchJunks() {
 
-            Junks = new Dictionary<Int32, CHUNK>();
+            Dictionary<Int32, CHUNK> junks;
+            Chunks.TryGetValue(JUNK_CHUNK, out junks);
 
-            int index = Find(JUNK_CHUNK, 0, Avi.Length);
+            int index = Find(JUNK, 0, Avi.Length);
             while (index > 0) {
                 CHUNK chunk = new CHUNK(Avi, index - 4);
-                Junks.Add(index + 4, chunk);
-                index = Find(JUNK_CHUNK, index, Avi.Length);
+                junks?.Add(index + 4, chunk);
+                index = Find(JUNK, index, Avi.Length);
             }
 
         }
