@@ -91,6 +91,14 @@ namespace AVIStenography {
             Console.Write(" ] ");
         }
 
+        public static void ConsolePrintInfo() {
+            Console.Write("[ ");
+            Console.ForegroundColor = ConsoleColor.DarkBlue;
+            Console.Write("INFO");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write(" ] ");
+        }
+
         //public static bool ConsoleOption(string text) {
         //    Console.WriteLine(text);
 

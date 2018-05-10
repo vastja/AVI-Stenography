@@ -17,22 +17,32 @@ namespace AVIStenography {
         public enum Actions {extract, hide};
         public enum DataTypes { junk, vids, auds};
 
-        [Value(0, Required = true)]
+        private const string actionHelp = "H for message hiding, E for message extracting";
+        private const string filePathHelp = "Path (absolute or relative) to .avi file";
+        private const string messageHelp = "Message to be hidden into .avi file. Use prefix 'file:' to load message " +
+                                           "from file (absolute or relative path specification follows prefix).";
+        private const string forceHelp = "Enable writing to compressed data streams";
+        private const string usedHelp = "Data streams used for hiding message. Stream types are separated with comma " +
+                                        "values=junk,vids,auds (for example --used junk,vids,auds). Streams will be used" +
+                                        " in order as specified (default order is junk,vids,auds).";
+        private const string outputFilePathHelp = "Absolute or relative path to final file.";
+
+        [Value(0, Required = true, HelpText = actionHelp)]
         public Actions Action { get; set; }
 
-        [Value(1, Required = true)]
+        [Value(1, Required = true, HelpText = filePathHelp)]
         public string FilePath { get; set; }
 
-        [Value(2, Required = true)]
+        [Option('m',"message", Required = false, HelpText = messageHelp)]
         public string Message { get; set; }
 
-        [Option('f',"force", Required = false, Default = false)]
+        [Option('f',"force", Required = false, Default = false, HelpText = forceHelp)]
         public bool Force { get; set; }
 
-        [Option('u',"used", Required = false, Separator = ',', Min = 1, Max = 3, Default = new DataTypes[] { DataTypes.junk, DataTypes.vids, DataTypes.auds })]
+        [Option('u',"used", Required = false, Separator = ',', Min = 1, Max = 3, Default = new DataTypes[] { DataTypes.junk, DataTypes.vids, DataTypes.auds }, HelpText = usedHelp)]
         public IEnumerable<DataTypes> Used { get; set; }
 
-        [Option('o', "output-file", Required = false, Default = "temp.avi")]
+        [Option('o', "output-file", Required = false, Default = "temp.avi", HelpText = outputFilePathHelp)]
         public string OutputFilePath { get; set; }
 
     }
@@ -60,8 +70,9 @@ namespace AVIStenography {
         /// <param name="options">Parsed options</param>
         public static void RunOptionsAndReturnExitCode(Options options) {
 
-            byte[] avi = IOUtils.LoadAvi(options.FilePath);
-            if (avi == null) {
+            if (options.Action == Options.Actions.hide && options.Message == null) {
+                IOUtils.ConsolePrintFailure();
+                Console.WriteLine("Message has to be specified in hide mode.");
                 Exit(-1);
             }
 
@@ -74,6 +85,13 @@ namespace AVIStenography {
             }
 
             if (message == null) {
+                IOUtils.ConsolePrintFailure();
+                Console.WriteLine("Message cannot be empty.");
+                Exit(-1);
+            }
+
+            byte[] avi = IOUtils.LoadAvi(options.FilePath);
+            if (avi == null) {
                 Exit(-1);
             }
 
@@ -84,8 +102,15 @@ namespace AVIStenography {
                 Console.WriteLine($"Hidden message is: {hiddenMessage}");
             }
             else {
-                StenogrpahyUtils.HideMessage(avifh, message, options.Force, options.Used);
-                IOUtils.SaveAvi(options.OutputFilePath, avifh.Avi);
+                if (StenogrpahyUtils.HideMessage(avifh, message, options.Force, options.Used)) {
+                    IOUtils.ConsolePrintSuccess();
+                    Console.WriteLine("Hiding data.");
+                    IOUtils.SaveAvi(options.OutputFilePath, avifh.Avi);
+                }
+                else {
+                    IOUtils.ConsolePrintFailure();
+                    Console.WriteLine("Message hidding failed.");
+                }
             }
 
         }
@@ -104,7 +129,7 @@ namespace AVIStenography {
         /// </summary>
         /// <param name="code">Exit code</param>
         public static void Exit(int code) {
-            Console.ReadKey();
+            // Console.ReadKey();
             Environment.Exit(code);
         }
 

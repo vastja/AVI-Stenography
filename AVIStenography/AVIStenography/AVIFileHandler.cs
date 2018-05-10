@@ -133,7 +133,7 @@ namespace AVIStenography {
                     return (avish, bih);
                 }
 
-                index = Find(strh, 0, Avi.Length);
+                index = Find(strh, index, Avi.Length);
             }
 
             return (new AVISTREAMHEADER(), new BITMAPINFOHEADER());
@@ -149,7 +149,7 @@ namespace AVIStenography {
                     return avish;
                 }
 
-                index = Find(strh, 0, Avi.Length);
+                index = Find(strh, index, Avi.Length);
             }
 
             return new AVISTREAMHEADER();

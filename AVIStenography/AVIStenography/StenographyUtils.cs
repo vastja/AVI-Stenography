@@ -30,7 +30,13 @@ namespace AVIStenography {
             message += MESSAGE_END;
             
             if (!CheckAvailableSpace(avifh, message, hideTo)) {
+                IOUtils.ConsolePrintFailure();
+                Console.WriteLine("There is not enough space for message");
                 return false;
+            }
+            else {
+                IOUtils.ConsolePrintSuccess();
+                Console.WriteLine("Space check.");
             }
 
             foreach (Options.DataTypes type in hideTo) {
@@ -42,7 +48,7 @@ namespace AVIStenography {
 
                         foreach (KeyValuePair<Int32, CHUNK> kvp in chunks) {
                             message = HideData(avifh.Avi, kvp.Key, kvp.Value.ckSize, message);
-                            if (message == null) {
+                            if (message == String.Empty) {
                                 return true;
                             }
                         }
@@ -200,8 +206,11 @@ namespace AVIStenography {
         private static bool CheckAvailableSpace(AVIFileHandler avifh, string message, IEnumerable<Options.DataTypes> streams) {
 
             (Int32, Int32, Int32, Int32) chunkSizes = GetStreamsAvailableChunksSize(avifh);
+            IOUtils.ConsolePrintInfo();
             Console.WriteLine($"Available free junk space: {chunkSizes.Item1}B");
+            IOUtils.ConsolePrintInfo();
             Console.WriteLine($"Available free video space: {chunkSizes.Item2 + chunkSizes.Item3}B");
+            IOUtils.ConsolePrintInfo();
             Console.WriteLine($"Available free audio space: {chunkSizes.Item4}B");
 
             int[] sizes = new int[3] { chunkSizes.Item1, chunkSizes.Item2 + chunkSizes.Item3, chunkSizes.Item4};
@@ -215,14 +224,14 @@ namespace AVIStenography {
 
         }
 
-        private static bool CheckCompression(bool compression, bool force, Options.DataTypes type) {
+        private static bool CheckCompression(bool uncompressed, bool force, Options.DataTypes type) {
 
-            if (compression && force) {
+            if (!uncompressed && force) {
                 IOUtils.ConsolePrintWarning();
-                Console.WriteLine($"Writing to compressed {type} strem due to force.");
+                Console.WriteLine($"Writing to compressed {type} stream due to force.");
                 return true;
             }
-            else if (compression) {
+            else if (!uncompressed) {
                 IOUtils.ConsolePrintWarning();
                 Console.WriteLine($"Writing to compressed {type} is not allowed. See --force flag to enable writing to compressed streams.");
                 return false;
